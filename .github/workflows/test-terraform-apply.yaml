@@ -10,7 +10,7 @@ permissions:
 jobs:
   terraform-lab:
     runs-on: ubuntu-latest
-    environment: aws-lab
+    
 
     steps:
       - name: Checkout repository
