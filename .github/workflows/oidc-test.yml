@@ -13,6 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      
+      - name: Show repository identifiers
+        run: |
+          echo "Owner ID: $GITHUB_REPOSITORY_OWNER_ID"
+          echo "Repository ID: $GITHUB_REPOSITORY_ID"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
