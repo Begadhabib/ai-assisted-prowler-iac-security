@@ -55,8 +55,8 @@ jobs:
         with:
           provider: aws
           output-formats: html json-ocsf
+          flags: --resource-tag 'Project=ai-assisted-prowler-iac-security'
           extra-env: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_REGION AWS_DEFAULT_REGION
-
       - name: Notify Slack - Scan Completed
         if: steps.prowler.outcome == 'success'
         env:
