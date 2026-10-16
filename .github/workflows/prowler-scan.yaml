@@ -1,0 +1,96 @@
+
+name: Prowler AWS Security Scan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: eu-central-1
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::230305981162:role/GitHubActions-IaC-Security
+          aws-region: eu-central-1
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=terraform validate
+
+      - name: Terraform Plan
+        run: terraform -chdir=terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform -chdir=terraform apply -input=false -auto-approve tfplan
+
+      - name: Run Prowler AWS scan
+        id: prowler
+        uses: prowler-cloud/prowler@5.25
+        with:
+          provider: aws
+          output-formats: html json-ocsf
+          extra-env: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_REGION AWS_DEFAULT_REGION
+
+      - name: Notify Slack - Scan Completed
+        if: steps.prowler.outcome == 'success'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n --arg url "$RUN_URL" \
+            '{text: ("Prowler AWS scan completed successfully.\nReport and artifacts: " + $url)}')
+          curl --fail --silent --show-error \
+            -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
+
+      - name: Upload scan reports
+        if: always() && steps.prowler.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prowler-reports
+          path: |
+            **/*.html
+            **/*.ocsf.json
+            **/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Terraform Destroy
+        id: destroy
+        if: always() && steps.apply.outcome == 'success'
+        run: terraform -chdir=terraform destroy -input=false -auto-approve
+
+      - name: Notify Slack - Destroy Completed
+        if: steps.destroy.outcome == 'success'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n --arg url "$RUN_URL" \
+            '{text: ("Terraform Destroy completed successfully. Lab resources were cleaned up.\nWorkflow: " + $url)}')
+          curl --fail --silent --show-error \
+            -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
