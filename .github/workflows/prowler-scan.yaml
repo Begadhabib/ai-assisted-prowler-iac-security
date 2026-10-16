@@ -44,7 +44,37 @@ jobs:
 
       - name: Terraform Plan
         run: terraform -chdir=terraform plan -input=false -out=tfplan
+      - name: Install Prowler CLI
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install prowler
+      - name: Scan Terraform Before Apply
+        id: prowler-iac
+        run: prowler iac --scan-path ./terraform
+      - name: Notify Slack - IaC Scan Result
+        if: always() && steps.prowler-iac.outcome != 'skipped'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SCAN_STATUS: ${{ steps.prowler-iac.outcome }}
+        run: |
+          set -euo pipefail
 
+          payload=$(jq -n \
+            --arg status "$SCAN_STATUS" \
+            --arg url "$RUN_URL" \
+            '{
+              text: (
+                ":mag: *Prowler Terraform IaC Scan*\n" +
+                "Status: " + $status + "\n" +
+                "Workflow details and scan logs: " + $url
+              )
+            }')
+
+          curl --fail --silent --show-error \
+            -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
+          
       - name: Terraform Apply
         id: apply
         run: terraform -chdir=terraform apply -input=false -auto-approve tfplan
