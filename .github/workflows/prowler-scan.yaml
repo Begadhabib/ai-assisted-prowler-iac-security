@@ -11,6 +11,7 @@ permissions:
 jobs:
   security-scan:
     runs-on: ubuntu-latest
+
     env:
       AWS_DEFAULT_REGION: eu-central-1
       TF_IN_AUTOMATION: "true"
@@ -33,6 +34,10 @@ jobs:
 
       - name: Terraform Init
         run: terraform -chdir=terraform init -backend=false
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: terraform
 
       - name: Terraform Validate
         run: terraform -chdir=terraform validate
@@ -90,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           payload=$(jq -n --arg url "$RUN_URL" \
-            '{text: ("Terraform Destroy completed successfully. Lab resources were cleaned up.\nWorkflow: " + $url)}')
+            '{text: ("Terraform Destroy completed successfully.\nLab resources were cleaned up.\nWorkflow: " + $url)}')
           curl --fail --silent --show-error \
             -H 'Content-type: application/json' \
             --data "$payload" "$SLACK_WEBHOOK_URL"

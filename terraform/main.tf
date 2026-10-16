@@ -2,6 +2,14 @@
 # Intentionally vulnerable IaC security lab.
 # Use only for short-lived testing and destroy after the lab.
 
+locals {
+  common_tags = {
+    Project     = "ai-assisted-prowler-iac-security"
+    Environment = "security-lab"
+    ManagedBy   = "Terraform"
+  }
+}
+
 # Get the current AWS account and region
 data "aws_caller_identity" "current" {}
 
@@ -32,10 +40,9 @@ resource "aws_vpc" "lab" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
-    Name        = "ai-iac-security-lab-vpc"
-    Environment = "security-lab"
-  }
+  tags = merge(local.common_tags, {
+    Name = "ai-iac-security-lab-vpc"
+  })
 }
 
 resource "aws_subnet" "lab" {
@@ -43,24 +50,22 @@ resource "aws_subnet" "lab" {
   cidr_block              = "10.20.1.0/24"
   map_public_ip_on_launch = false
 
-  tags = {
-    Name        = "ai-iac-security-lab-subnet"
-    Environment = "security-lab"
-  }
+  tags = merge(local.common_tags, {
+    Name = "ai-iac-security-lab-subnet"
+  })
 }
 
 # S3 bucket name must be globally unique
 resource "aws_s3_bucket" "app_data" {
   bucket = "ai-iac-lab-${data.aws_caller_identity.current.account_id}-${var.aws_region}"
 
-  tags = {
-    Name        = "ai-iac-test"
-    Environment = "security-lab"
-  }
+  tags = merge(local.common_tags, {
+    Name = "ai-iac-test"
+  })
 }
 
 # Intentionally missing explicit encryption, versioning,
-# and public access block configuration for future security scanning.
+# and public access block configuration for security scanning.
 
 resource "aws_security_group" "app_sg" {
   name        = "ai-iac-test-sg"
@@ -82,10 +87,9 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name        = "ai-iac-test-sg"
-    Environment = "security-lab"
-  }
+  tags = merge(local.common_tags, {
+    Name = "ai-iac-test-sg"
+  })
 }
 
 resource "aws_instance" "app" {
@@ -106,8 +110,7 @@ resource "aws_instance" "app" {
     encrypted = false
   }
 
-  tags = {
-    Name        = "ai-iac-test-instance"
-    Environment = "security-lab"
-  }
+  tags = merge(local.common_tags, {
+    Name = "ai-iac-test-instance"
+  })
 }
