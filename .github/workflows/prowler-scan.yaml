@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Prowler AWS scan
         id: prowler
-        uses: prowler-cloud/prowler@5.25
+        uses: prowler-cloud/prowler@5.25.0
         with:
           provider: aws
           output-formats: html json-ocsf
